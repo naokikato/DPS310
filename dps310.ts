@@ -1,7 +1,7 @@
 /**
  * Custom blocks
  */
-//% weight=100 color=#0fbc11 icon="" block="DPS310"
+//% weight=100 color=#0fbc11 icon="" block="気圧(DPS310)"
 namespace IML_DPS310
 {
     //% block
