@@ -5,15 +5,17 @@
 namespace IML_DPS310
 {
     //% block
-    //% block="気圧"
+    //% block="気圧(Pa)"
     //% weight=100    
     export function GetPressure(): number {
+        readData()
         return Math.round(scaledPress * 10) / 10
     }
     //% block
-    //% block="温度"
-    //% weight=100    
+    //% block="温度(°C)"
+    //% weight=99
     export function GetTemprature(): number {
+        readData()
         return Math.round(scaledTemp * 10) / 10
     }
 
@@ -88,16 +90,10 @@ namespace IML_DPS310
         return temp;
     }
 
-    // main
-    basic.pause(10)
-    initializeDPS310()
-    basic.pause(10)
-    readCalibrationCoefficients()
-    basic.pause(10)
-
     let scaledTemp = 0
     let scaledPress = 0
-    basic.forever(function() {
+    function readData() 
+    {
         pins.i2cWriteNumber(ADDRESS, (0x08 << 8) | 0x02, NumberFormat.UInt16BE);
         let rawTemperature = read24BitData(0x03); // Replace 0x03 with actual register
 
@@ -108,5 +104,93 @@ namespace IML_DPS310
         scaledTemp = calculateTemperature(rawTemperature);
 
         basic.pause(10)
-    })
+    }
+
+    // main
+    basic.pause(10)
+    initializeDPS310()
+    basic.pause(10)
+    readCalibrationCoefficients()
+    basic.pause(10)
+
+
+    const PRESS_EVENT_ID1 = 1001;
+    const PRESS_EVENT_ID2 = 1002;
+    const TEMP_EVENT_ID1 = 1003;
+    const TEMP_EVENT_ID2 = 1004;
+    let threshold1 = 1020;
+    let threshold2 = 990;
+    let threshold3 = 35;
+    let threshold4 = 5;
+    let interval = 100;
+
+    //% block
+    //% block="気圧の閾値の上を $value1 下を $value2 に設定する"
+    //% weight=90 color=#3fbc41
+    export function setSensor1(pin: AnalogPin, value1: number, value2: number) {
+        threshold1 = value1;
+        threshold2 = value2;
+        startListening();
+    }
+    //% block
+    //% block="気圧が閾値以上になったとき"
+    //% weight=89 color=#3fbc41
+    export function onDetected1(handler: () => void) {
+        control.onEvent(PRESS_EVENT_ID1, EventBusValue.MICROBIT_EVT_ANY, handler);
+    }
+    //% block
+    //% block="気圧が閾値以下になったとき"
+    //% weight=88 color=#3fbc41
+    export function onDetected2(handler: () => void) {
+        control.onEvent(PRESS_EVENT_ID2, EventBusValue.MICROBIT_EVT_ANY, handler);
+    }
+    //% block
+    //% block="温度の閾値の上を $value1 下を $value2 に設定する"
+    //% weight=80 color=#3fbc41
+    export function setSensor2(pin: AnalogPin, value1: number, value2: number) {
+        threshold3 = value1;
+        threshold4 = value2;
+        startListening();
+    }
+    //% block
+    //% block="温度が閾値以上になったとき"
+    //% weight=79 color=#3fbc41
+    export function onDetected3(handler: () => void) {
+        control.onEvent(TEMP_EVENT_ID1, EventBusValue.MICROBIT_EVT_ANY, handler);
+    }
+    //% block
+    //% block="温度が閾値以下になったとき"
+    //% weight=78 color=#3fbc41
+    export function onDetected4(handler: () => void) {
+        control.onEvent(TEMP_EVENT_ID2, EventBusValue.MICROBIT_EVT_ANY, handler);
+    }
+
+    // イベントリスナーの開始
+    let listening = false
+    function startListening() {
+        if( listening ) return
+        listening = true;
+        control.inBackground(() => {
+            while (true) {
+                readData();
+                if (scaledPress >= threshold1) {
+                    // イベントを発生させる
+                    control.raiseEvent(PRESS_EVENT_ID1, scaledPress);
+                }
+                if (scaledPress <= threshold2) {
+                    // イベントを発生させる
+                    control.raiseEvent(PRESS_EVENT_ID2, scaledPress);
+                }
+                if (scaledTemp >= threshold1) {
+                    // イベントを発生させる
+                    control.raiseEvent(TEMP_EVENT_ID1, scaledTemp);
+                }
+                if (scaledTemp <= threshold2) {
+                    // イベントを発生させる
+                    control.raiseEvent(TEMP_EVENT_ID2, scaledTemp);
+                }
+                basic.pause(interval);
+            }
+        });
+    }
 }
